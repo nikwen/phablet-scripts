@@ -1,0 +1,41 @@
+#!/bin/bash
+
+if [ -t 0 ]; then stty -echo -icanon time 0 min 0; fi
+
+echo Phablet Record
+echo ==============
+echo
+
+command -v phablet-screenshot >/dev/null 2>&1 || { echo >&2 "This script depends on the phablet-screenshot command which is part of the phablet-tools package. Install it using the following command:
+        sudo apt-get install phablet-tools"; if [ -t 0 ]; then stty sane; fi; exit 1; }
+command -v convert >/dev/null 2>&1 || { echo >&2 "This script depends on the convert command which is part of the imagemagick package. Install it using the following command:
+        sudo apt-get install imagemagick"; if [ -t 0 ]; then stty sane; fi; exit 1; }
+
+dir=`date +%Y-%m-%d_%H:%M:%S`
+
+mkdir -p ~/phablet-records/$dir
+
+echo Recording started.
+echo Recordings will be saved to ~/phablet-records/$dir.
+echo Press x to stop recording.
+echo
+
+i=0
+keypress=''
+while [ "x$keypress" = "x" ]; do
+        echo Frame \#$i
+        printf -v name '%04d' $i
+        phablet-screenshot ~/phablet-records/$dir/$name.png >/dev/null
+        ((i=$i+1))
+        read keypress #Stop recording when x is pressed
+done
+
+echo Creating animated gif...
+
+convert -delay 150 -loop 0 ~/phablet-records/$dir/*.png ~/phablet-records/$dir/recording.gif
+
+echo Animated gif saved to ~/phablet-records/$dir/recording.gif.
+
+if [ -t 0 ]; then stty sane; fi
+
+exit 0
