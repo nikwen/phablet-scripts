@@ -1,0 +1,124 @@
+#!/bin/bash
+
+if ( [ "$1" = "--help" ] || [ "$1" = "-h" ] || ( [ $# -ne 0 ] && ! ( [ "$1" = "--restore" ] && [ $# = 2 ] ) ) ); then
+	echo "Usage: phablet-backup [OPTIONS...]"
+	echo
+	echo "Options:"
+	echo
+	echo "    -h,--help This help"
+	echo "    --restore FILE"
+	echo "              Restore the given backup file"
+	echo
+	exit 0
+elif ( [ "$1" = "--restore" ] && [ $# = 2 ] ); then
+	echo "phablet-backup"
+	echo "=============="
+	echo
+	echo "DISCLAIMER: Only use this software if you know what you are doing. I am not"
+	echo "responsible for any damage to your device or any loss of data. Check out the"
+	echo "LICENSE file for further information."
+	echo
+	echo "Will restore the following file: $2"
+	read -r -p "Do you want to continue? [y/n] "
+	if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+		echo "Backup aborted."
+    	exit 1
+	fi
+	echo
+	echo "Pushing the backup file to the device..."
+
+	adb push $2 /home/phablet/backup.tar.gz
+
+	echo
+	echo "Restoring the backup on the device..."
+	echo
+
+	adb shell tar -xzvf backup.tar.gz
+
+	echo
+	echo "Restoring the backup finished."
+	echo
+	echo "If you want to reinstall the apps which you had installed on your old system,"
+	echo "check out the file applist.txt which contains a list of all your previously"
+	echo "installed apps."
+	
+	exit 0
+fi
+
+paths=()
+
+echo "phablet-backup"
+echo "=============="
+echo
+echo "DISCLAIMER: Only use this software if you know what you are doing. I am not"
+echo "responsible for any damage to your device or any loss of data. Check out the"
+echo "LICENSE file for further information."
+echo
+
+dir=`date +%Y-%m-%d_%H:%M:%S`
+
+mkdir -p ~/phablet-backups/$dir
+
+echo "Backups will be saved to ~/phablet-backups."
+echo
+echo "Saving a list of installed click packages..."
+
+adb shell click list > ~/phablet-backups/$dir/applist.txt
+
+echo "Saved the list to the file applist.txt in the backup directory."
+echo "It can be used to manually reinstall your apps after migrating to the new"
+echo "system."
+echo
+echo "Select which files and/or folders from your home directory should be backed up"
+echo "and mark those with an x. Press enter after each line to proceed."
+echo 
+
+for line in $(adb shell ls /home/phablet -1); do
+	line=$(echo $line | tr -d '\r')
+	read -r -p "$line " backup
+	if [ "$backup" = "x" ]; then
+		paths+=($line)
+	fi
+done
+
+echo
+echo "Select which app data folders (not the apps themselves) should be backed up."
+echo 
+
+for line in $(adb shell ls /home/phablet/.local/share -1); do
+	line=$(echo $line | tr -d '\r')
+	read -r -p "$line " backup
+	if [ "$backup" = "x" ]; then
+		paths+=(".local/share/$line")
+	fi
+done
+
+echo
+echo "Will backup the following files/folders:"
+echo
+
+printf -- '%s\n' "${paths[@]}"
+
+echo
+echo "Backing up..."
+echo 
+
+adb shell tar -czvf backup.tar.gz ${paths[*]}
+
+echo
+echo "Pulling the backup file from the device..."
+
+adb pull /home/phablet/backup.tar.gz ~/phablet-backups/$dir
+
+echo
+echo "Removing the backup file on the device..."
+
+adb shell rm /home/phablet/backup.tar.gz
+
+echo "Restore this backup using the \"phablet-backup --restore FILE\" command." > ~/phablet-backups/$dir/RESTORE.txt
+
+echo
+echo "Backup finished."
+echo "Restore it using the \"phablet-backup --restore FILE\" command."
+
+exit 0
